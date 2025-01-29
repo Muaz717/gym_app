@@ -30,7 +30,7 @@ func (s *Storage) savePerson(
 func (s *Storage) findAllPeople(ctx context.Context) ([]models.Person, error) {
 	const op = "postgres.findAllPeople"
 
-	query := `SELECT id, `
+	query := `SELECT id, name FROM person`
 
 	rows, err := s.db.Query(ctx, query)
 	if err != nil {
@@ -43,4 +43,22 @@ func (s *Storage) findAllPeople(ctx context.Context) ([]models.Person, error) {
 	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Person])
 }
 
-//func (s *Storage)
+func (s *Storage) findPersonByName(
+	ctx context.Context,
+	name string,
+) (models.Person, error) {
+	const op = "postgres.findPersonByName"
+
+	query := `SELECT number, recording_day, person FROM membership JOIN person
+				ON membership.person = person.name AND person.name = $1`
+
+	row := s.db.QueryRow(ctx, query, name)
+
+	var person models.Person
+	err := row.Scan(&person)
+	if err != nil {
+		return models.Person{}, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return person, nil
+}
