@@ -1,11 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"gym_app/internal/config"
 	"gym_app/internal/lib/logger/handlers/slogpretty"
+	app "gym_app/internal/pkg"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 const (
@@ -15,21 +18,28 @@ const (
 )
 
 func main() {
-
-	// TODO: init config
+	ctx := context.Background()
 
 	cfg := config.MustLoad()
 
-	fmt.Println(cfg)
-
-	// TODO: init logger
 	log := setupLogger(cfg.Env)
 
 	log.Info("starting application")
-	// TODO: init app
 
-	// TODO: run app
+	application := app.New(ctx, log, cfg)
 
+	go application.HTTPSrv.Run()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+
+	sign := <-stop
+
+	log.Info("stopping application", slog.String("signal", sign.String()))
+
+	application.HTTPSrv.Stop()
+
+	log.Info("application stopped")
 }
 
 func setupLogger(env string) *slog.Logger {

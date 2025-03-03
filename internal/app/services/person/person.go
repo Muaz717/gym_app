@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gym_app/internal/app/services"
 	"gym_app/internal/app/storage"
 	"gym_app/internal/lib/logger/sl"
 	"gym_app/internal/models"
@@ -16,9 +17,9 @@ type PersonService struct {
 }
 
 type PersonStorage interface {
-	savePerson(ctx context.Context, person models.Person) (int, error)
-	findAllPeople(ctx context.Context) ([]models.Person, error)
-	//findPersonByName(ctx context.Context, name string) (models.Person, error)
+	SavePerson(ctx context.Context, person models.Person) (int, error)
+	FindAllPeople(ctx context.Context) ([]models.Person, error)
+	FindMemsByPersonName(ctx context.Context, name string) ([]models.Membership, error)
 }
 
 var (
@@ -38,7 +39,7 @@ func New(
 	}
 }
 
-func (p *PersonService) addPerson(ctx context.Context, person models.Person) (int, error) {
+func (p *PersonService) AddPerson(ctx context.Context, person models.Person) (int, error) {
 
 	const op = "services.person.addPerson"
 
@@ -48,7 +49,7 @@ func (p *PersonService) addPerson(ctx context.Context, person models.Person) (in
 
 	log.Info("Registering new user")
 
-	personId, err := p.personStorage.savePerson(ctx, person)
+	personId, err := p.personStorage.SavePerson(ctx, person)
 	if err != nil {
 		if errors.Is(err, storage.ErrUserExists) {
 			log.Warn("user already exists", sl.Error(err))
@@ -62,8 +63,8 @@ func (p *PersonService) addPerson(ctx context.Context, person models.Person) (in
 	return personId, nil
 }
 
-func (p *PersonService) findAllPeople(ctx context.Context) ([]models.Person, error) {
-	const op = "services.person.findAllPeople"
+func (p *PersonService) FindAllPeople(ctx context.Context) ([]models.Person, error) {
+	const op = "services.person.FindAllPeople"
 
 	log := p.log.With(
 		slog.String("op", op),
@@ -71,7 +72,7 @@ func (p *PersonService) findAllPeople(ctx context.Context) ([]models.Person, err
 
 	log.Info("Starting to find people")
 
-	allPeople, err := p.personStorage.findAllPeople(ctx)
+	allPeople, err := p.personStorage.FindAllPeople(ctx)
 	if err != nil {
 		log.Warn("error", sl.Error(err))
 
@@ -83,8 +84,26 @@ func (p *PersonService) findAllPeople(ctx context.Context) ([]models.Person, err
 	return allPeople, nil
 }
 
-//func (p *PersonService) findPersonByName(ctx context.Context, name string) (models.Person, error) {
-//	const op = "services.person.findPersonByName"
-//
-//
-//}
+func (p *PersonService) FindMemsByPersonName(ctx context.Context, name string) ([]models.Membership, error) {
+	const op = "services.person.findPersonByName"
+
+	log := p.log.With(
+		slog.String("op", op),
+	)
+
+	memberships, err := p.personStorage.FindMemsByPersonName(ctx, name)
+	if err != nil {
+		log.Warn("error", sl.Error(err))
+
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+
+	var mems []models.Membership
+	for _, membership := range memberships {
+		mems = append(mems, services.EnrichMembership(membership))
+	}
+
+	log.Info("Person are found")
+
+	return mems, nil
+}

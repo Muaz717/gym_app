@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gym_app/internal/app/services"
 	"gym_app/internal/lib/logger/sl"
 	"gym_app/internal/models"
 	"log/slog"
+	"time"
 )
 
 type MembershipService struct {
@@ -15,7 +17,8 @@ type MembershipService struct {
 }
 
 type MembershipStorage interface {
-	saveMembership(ctx context.Context, membership models.Membership) (int, error)
+	SaveMembership(ctx context.Context, membership models.Membership) (int, error)
+	FindAllMemberships(ctx context.Context) ([]models.Membership, error)
 }
 
 var (
@@ -32,8 +35,8 @@ func New(
 	}
 }
 
-func (m *MembershipService) addMembership(ctx context.Context, membership models.Membership) (int, error) {
-	const op = "services.membership.addMembership"
+func (m *MembershipService) AddMembership(ctx context.Context, membership models.Membership) (int, error) {
+	const op = "services.membership.AddMembership"
 
 	log := m.log.With(
 		slog.String("op", op),
@@ -41,7 +44,9 @@ func (m *MembershipService) addMembership(ctx context.Context, membership models
 
 	log.Info("Adding new membership")
 
-	memId, err := m.membershipStorage.saveMembership(ctx, membership)
+	membership.RecordingDay = time.Now()
+
+	memId, err := m.membershipStorage.SaveMembership(ctx, membership)
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, sl.Error(err))
 	}
@@ -49,4 +54,27 @@ func (m *MembershipService) addMembership(ctx context.Context, membership models
 	log.Info("membership registered", "mid", memId)
 
 	return memId, nil
+}
+
+func (m *MembershipService) FindAllMemberships(ctx context.Context) ([]models.Membership, error) {
+	const op = "services.membership.FindAllMemberships"
+
+	log := m.log.With(
+		slog.String("op", op),
+	)
+
+	memberships, err := m.membershipStorage.FindAllMemberships(ctx)
+	if err != nil {
+		log.Warn("error", sl.Error(err))
+
+		return nil, fmt.Errorf("%s: %w", op, err)
+	}
+	var mems []models.Membership
+	for _, membership := range memberships {
+		mems = append(mems, services.EnrichMembership(membership))
+	}
+
+	log.Info("Memberships are found")
+
+	return mems, nil
 }

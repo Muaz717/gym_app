@@ -9,7 +9,7 @@ import (
 	"gym_app/internal/models"
 )
 
-func (s *Storage) savePerson(
+func (s *Storage) SavePerson(
 	ctx context.Context,
 	person models.Person,
 ) (int, error) {
@@ -27,10 +27,10 @@ func (s *Storage) savePerson(
 	return personId, nil
 }
 
-func (s *Storage) findAllPeople(ctx context.Context) ([]models.Person, error) {
+func (s *Storage) FindAllPeople(ctx context.Context) ([]models.Person, error) {
 	const op = "postgres.findAllPeople"
 
-	query := `SELECT id, name FROM person`
+	query := `SELECT * FROM person`
 
 	rows, err := s.db.Query(ctx, query)
 	if err != nil {
@@ -43,22 +43,31 @@ func (s *Storage) findAllPeople(ctx context.Context) ([]models.Person, error) {
 	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Person])
 }
 
-func (s *Storage) findPersonByName(
+func (s *Storage) FindMemsByPersonName(
 	ctx context.Context,
 	name string,
-) (models.Person, error) {
+) ([]models.Membership, error) {
 	const op = "postgres.findPersonByName"
 
-	query := `SELECT number, recording_day, person FROM membership JOIN person
-				ON membership.person = person.name AND person.name = $1`
+	query := `SELECT m1.number, m1.recording_day FROM membership m1 WHERE m1.person = $1`
 
-	row := s.db.QueryRow(ctx, query, name)
-
-	var person models.Person
-	err := row.Scan(&person)
+	rows, err := s.db.Query(ctx, query, name)
 	if err != nil {
-		return models.Person{}, fmt.Errorf("%s: %w", op, err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
+		}
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return person, nil
+	var mems []models.Membership
+	for rows.Next() {
+		mem := models.Membership{}
+		err := rows.Scan(&mem.Number, &mem.RecordingDay)
+		if err != nil {
+			return nil, fmt.Errorf("unable to scan row: %w", err)
+		}
+		mems = append(mems, mem)
+	}
+
+	return mems, nil
 }
