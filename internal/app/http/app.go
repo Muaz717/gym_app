@@ -43,7 +43,7 @@ func New(
 	people := engine.Group("/people")
 	{
 		people.POST("/add", personHandle.AddPerson)
-		people.GET("/:name", personHandle.FindMemsByPersonName)
+		people.GET("/:name", personHandle.FindSubsByPersonName)
 		people.GET("/", personHandle.FindAllPeople)
 	}
 

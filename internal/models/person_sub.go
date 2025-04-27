@@ -2,8 +2,8 @@ package models
 
 import "time"
 
-// ClientSubscription представляет подписку клиента на абонемент
-type ClientSubscription struct {
+// PersonSubscription представляет подписку клиента на абонемент
+type PersonSubscription struct {
 	Number         string    `json:"number"`          // Номер абонемента
 	ClientID       int64     `json:"client_id"`       // ID клиента
 	SubscriptionID string    `json:"subscription_id"` // ID абонемента

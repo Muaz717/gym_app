@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"gym_app/internal/lib/logger/sl"
 	"gym_app/internal/models"
-	"gym_app/internal/services"
 	"gym_app/internal/storage"
 	"log/slog"
 )
@@ -98,12 +97,12 @@ func (p *PersonService) FindSubsByPersonName(ctx context.Context, name string) (
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	var subss []models.Subscription
-	for _, subscription := range subscriptions {
-		subss = append(subss, services.EnrichSubscription(subscription))
-	}
+	//var subss []models.Subscription
+	//for _, subscription := range subscriptions {
+	//	subss = append(subss, services.EnrichSubscription(subscription))
+	//}
 
 	log.Info("Person are found")
 
-	return subss, nil
+	return subscriptions, nil
 }

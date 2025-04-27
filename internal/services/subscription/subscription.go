@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"gym_app/internal/lib/logger/sl"
 	"gym_app/internal/models"
-	"gym_app/internal/services"
 	"log/slog"
-	"time"
 )
 
 type SubscriptionService struct {
@@ -44,8 +42,6 @@ func (m *SubscriptionService) AddSubscription(ctx context.Context, subscription 
 
 	log.Info("Adding new membership")
 
-	subscription.RecordingDay = time.Now()
-
 	subId, err := m.subscriptionStorage.SaveSubscription(ctx, subscription)
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, sl.Error(err))
@@ -69,12 +65,8 @@ func (m *SubscriptionService) FindAllSubscriptions(ctx context.Context) ([]model
 
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
-	var subs []models.Subscription
-	for _, subscription := range subscriptions {
-		subs = append(subs, services.EnrichSubscription(subscription))
-	}
 
 	log.Info("Subscriptions are found")
 
-	return subs, nil
+	return subscriptions, nil
 }

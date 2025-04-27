@@ -15,7 +15,7 @@ import (
 type PersonService interface {
 	AddPerson(ctx context.Context, person models.Person) (int, error)
 	FindAllPeople(ctx context.Context) ([]models.Person, error)
-	FindMemsByPersonName(ctx context.Context, name string) ([]models.Subscription, error)
+	FindSubsByPersonName(ctx context.Context, name string) ([]models.Subscription, error)
 }
 
 type PersonHandler struct {
@@ -90,7 +90,7 @@ func (h *PersonHandler) FindAllPeople(c *gin.Context) {
 	c.JSON(http.StatusOK, people)
 }
 
-func (h *PersonHandler) FindMemsByPersonName(c *gin.Context) {
+func (h *PersonHandler) FindSubsByPersonName(c *gin.Context) {
 	type Response struct {
 		Name        string                `json:"name"`
 		Memberships []models.Subscription `json:"memberships"`
@@ -110,7 +110,7 @@ func (h *PersonHandler) FindMemsByPersonName(c *gin.Context) {
 		return
 	}
 
-	memberships, err := h.personService.FindMemsByPersonName(h.ctx, name)
+	subscriptions, err := h.personService.FindSubsByPersonName(h.ctx, name)
 	if err != nil {
 		log.Error("failed to get person memberships", sl.Error(err))
 
@@ -120,7 +120,7 @@ func (h *PersonHandler) FindMemsByPersonName(c *gin.Context) {
 
 	personToShow := Response{
 		Name:        name,
-		Memberships: memberships,
+		Memberships: subscriptions,
 	}
 
 	log.Info("Person found")

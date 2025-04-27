@@ -13,11 +13,11 @@ func (s *Storage) AddSubscription(
 	ctx context.Context,
 	subscription models.Subscription,
 ) (int, error) {
-	const op = "postgres.saveMembership"
+	const op = "postgres.addSubscription"
 
-	query := `INSERT INTO membership(number, recording_day, person) VALUES($1, $2, $3) RETURNING id`
+	query := `INSERT INTO subscriptions(title, price, duration_days, freeze_days) VALUES($1, $2, $3, $4) RETURNING id`
 
-	row := s.db.QueryRow(ctx, query, subscription.Number, subscription.RecordingDay, subscription.Person.Name)
+	row := s.db.QueryRow(ctx, query, subscription.Title, subscription.Price, subscription.DurationDays, subscription.FreezeDays)
 
 	var subId int
 	if err := row.Scan(&subId); err != nil {
@@ -30,7 +30,7 @@ func (s *Storage) AddSubscription(
 func (s *Storage) FindAllSubscriptions(ctx context.Context) ([]models.Subscription, error) {
 	const op = "postgres.FindAllSubscriptions"
 
-	query := `SELECT * FROM membership`
+	query := `SELECT * FROM subscriptions`
 
 	rows, err := s.db.Query(ctx, query)
 	if err != nil {
@@ -43,7 +43,8 @@ func (s *Storage) FindAllSubscriptions(ctx context.Context) ([]models.Subscripti
 	var subs []models.Subscription
 	for rows.Next() {
 		sub := models.Subscription{}
-		err := rows.Scan(&sub.Id, &sub.Number, &sub.RecordingDay, &sub.Person.Name)
+		err := rows.Scan(&sub.ID, &sub.Title, &sub.Price, &sub.DurationDays, &sub.FreezeDays)
+
 		if err != nil {
 			return nil, fmt.Errorf("unable to scan row: %w", err)
 		}
