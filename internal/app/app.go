@@ -5,8 +5,8 @@ import (
 	"gym_app/internal/app/http"
 	"gym_app/internal/config"
 	"gym_app/internal/lib/logger/sl"
-	"gym_app/internal/services/membership"
 	"gym_app/internal/services/person"
+	"gym_app/internal/services/subscription"
 	"gym_app/internal/storage/postgres"
 	"log/slog"
 )

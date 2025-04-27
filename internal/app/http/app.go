@@ -2,20 +2,21 @@ package httpApp
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/gin-gonic/gin"
 	"gym_app/internal/config"
-	membershipHandler "gym_app/internal/http/membership"
 	personHandler "gym_app/internal/http/person"
+	membershipHandler "gym_app/internal/http/subscription"
 	"gym_app/internal/lib/logger/sl"
 	"log/slog"
 	"net/http"
+	"time"
 )
 
 type HttpApp struct {
 	HTTPServer *http.Server
-	router     chi.Router
+	engine     *gin.Engine
 	ctx        context.Context
 	log        *slog.Logger
 	cfg        config.Config
@@ -26,33 +27,35 @@ func New(
 	log *slog.Logger,
 	cfg config.Config,
 	personService personHandler.PersonService,
-	membershipService membershipHandler.MembershipService,
+	membershipService membershipHandler.SubscriptionService,
 ) *HttpApp {
 
 	personHandle := personHandler.New(ctx, log, personService)
 	membershipHandle := membershipHandler.New(ctx, log, membershipService)
 
-	router := chi.NewRouter()
+	gin.SetMode(gin.ReleaseMode)
+	engine := gin.New()
 
-	router.Use(middleware.RequestID)
-	//router.Use(mwLogger.New(log))
-	router.Use(middleware.Recoverer)
-	router.Use(middleware.URLFormat)
+	engine.Use(gin.Recovery())
+	//engine.Use(RequestIDMiddleware(log))
+	// engine.Use(CustomLoggerMiddleware(log)) // можно подключить свое логирование запросов
 
-	router.Route("/people", func(people chi.Router) {
-		people.Post("/add", personHandle.AddPerson)
-		people.Get("/{name}", personHandle.FindMemsByPersonName)
-		people.Get("/", personHandle.FindAllPeople)
-	})
+	people := engine.Group("/people")
+	{
+		people.POST("/add", personHandle.AddPerson)
+		people.GET("/:name", personHandle.FindMemsByPersonName)
+		people.GET("/", personHandle.FindAllPeople)
+	}
 
-	router.Route("/membership", func(membership chi.Router) {
-		membership.Post("/add", membershipHandle.AddMembership)
-		membership.Get("/", membershipHandle.FindAllMemberships)
-	})
+	membership := engine.Group("/membership")
+	{
+		membership.POST("/add", membershipHandle.AddSubscription)
+		membership.GET("/", membershipHandle.FindAllSubscriptions)
+	}
 
 	srv := &http.Server{
 		Addr:         cfg.Address,
-		Handler:      router,
+		Handler:      engine,
 		ReadTimeout:  cfg.Timeout,
 		WriteTimeout: cfg.Timeout,
 		IdleTimeout:  cfg.IdleTimeout,
@@ -60,7 +63,7 @@ func New(
 
 	return &HttpApp{
 		HTTPServer: srv,
-		router:     router,
+		engine:     engine,
 		ctx:        ctx,
 		log:        log,
 		cfg:        cfg,
@@ -75,13 +78,12 @@ func (a *HttpApp) Run() error {
 		slog.String("addr", a.cfg.Address),
 	)
 
-	if err := a.HTTPServer.ListenAndServe(); err != nil {
-		log.Error("failed to run http server", sl.Error(err))
+	log.Info("HTTP server is starting", slog.String("addr", a.cfg.Address))
 
+	if err := a.HTTPServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Error("failed to run http server", sl.Error(err))
 		return fmt.Errorf("%s: %w", op, err)
 	}
-
-	log.Info("HTTP server is running", slog.String("addr", a.HTTPServer.Addr))
 
 	return nil
 }
@@ -89,12 +91,14 @@ func (a *HttpApp) Run() error {
 func (a *HttpApp) Stop() error {
 	const op = "httpApp.Stop"
 
+	ctx, cancel := context.WithTimeout(a.ctx, 5*time.Second)
+	defer cancel()
+
 	a.log.With(slog.String("op", op)).
-		Info("stopping Http server", slog.String("addr", a.HTTPServer.Addr))
+		Info("stopping HTTP server", slog.String("addr", a.HTTPServer.Addr))
 
-	if err := a.HTTPServer.Shutdown(a.ctx); err != nil {
-		a.log.Error("failed to stop server", sl.Error(err))
-
+	if err := a.HTTPServer.Shutdown(ctx); err != nil {
+		a.log.Error("failed to gracefully shutdown server", sl.Error(err))
 		return fmt.Errorf("%s: %w", op, err)
 	}
 

@@ -43,10 +43,10 @@ func (s *Storage) FindAllPeople(ctx context.Context) ([]models.Person, error) {
 	return pgx.CollectRows(rows, pgx.RowToStructByName[models.Person])
 }
 
-func (s *Storage) FindMemsByPersonName(
+func (s *Storage) FindSubsByPersonName(
 	ctx context.Context,
 	name string,
-) ([]models.Membership, error) {
+) ([]models.Subscription, error) {
 	const op = "postgres.findPersonByName"
 
 	query := `SELECT m1.number, m1.recording_day FROM membership m1 WHERE m1.person = $1`
@@ -59,15 +59,15 @@ func (s *Storage) FindMemsByPersonName(
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	var mems []models.Membership
+	var subs []models.Subscription
 	for rows.Next() {
-		mem := models.Membership{}
-		err := rows.Scan(&mem.Number, &mem.RecordingDay)
+		sub := models.Subscription{}
+		err := rows.Scan(&sub.Number, &sub.RecordingDay)
 		if err != nil {
 			return nil, fmt.Errorf("unable to scan row: %w", err)
 		}
-		mems = append(mems, mem)
+		subs = append(subs, sub)
 	}
 
-	return mems, nil
+	return subs, nil
 }

@@ -19,7 +19,7 @@ type PersonService struct {
 type PersonStorage interface {
 	SavePerson(ctx context.Context, person models.Person) (int, error)
 	FindAllPeople(ctx context.Context) ([]models.Person, error)
-	FindMemsByPersonName(ctx context.Context, name string) ([]models.Membership, error)
+	FindSubsByPersonName(ctx context.Context, name string) ([]models.Subscription, error)
 }
 
 var (
@@ -84,26 +84,26 @@ func (p *PersonService) FindAllPeople(ctx context.Context) ([]models.Person, err
 	return allPeople, nil
 }
 
-func (p *PersonService) FindMemsByPersonName(ctx context.Context, name string) ([]models.Membership, error) {
+func (p *PersonService) FindSubsByPersonName(ctx context.Context, name string) ([]models.Subscription, error) {
 	const op = "services.person.findPersonByName"
 
 	log := p.log.With(
 		slog.String("op", op),
 	)
 
-	memberships, err := p.personStorage.FindMemsByPersonName(ctx, name)
+	subscriptions, err := p.personStorage.FindSubsByPersonName(ctx, name)
 	if err != nil {
 		log.Warn("error", sl.Error(err))
 
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	var mems []models.Membership
-	for _, membership := range memberships {
-		mems = append(mems, services.EnrichMembership(membership))
+	var subss []models.Subscription
+	for _, subscription := range subscriptions {
+		subss = append(subss, services.EnrichSubscription(subscription))
 	}
 
 	log.Info("Person are found")
 
-	return mems, nil
+	return subss, nil
 }
