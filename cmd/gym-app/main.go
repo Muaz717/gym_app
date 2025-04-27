@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"gym_app/internal/app"
 	"gym_app/internal/config"
 	"gym_app/internal/lib/logger/handlers/slogpretty"
-	app "gym_app/internal/pkg"
 	"log/slog"
 	"os"
 	"os/signal"

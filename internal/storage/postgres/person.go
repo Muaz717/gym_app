@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jackc/pgx/v5"
-	"gym_app/internal/app/storage"
 	"gym_app/internal/models"
+	"gym_app/internal/storage"
 )
 
 func (s *Storage) SavePerson(

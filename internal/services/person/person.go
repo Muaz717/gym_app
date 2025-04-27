@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gym_app/internal/app/services"
-	"gym_app/internal/app/storage"
 	"gym_app/internal/lib/logger/sl"
 	"gym_app/internal/models"
+	"gym_app/internal/services"
+	"gym_app/internal/storage"
 	"log/slog"
 )
 
