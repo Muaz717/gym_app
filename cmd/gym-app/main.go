@@ -1,7 +1,21 @@
+// @title       Gym API
+// @version     1.0
+// @description     Backend for Gym application
+// @termsOfService  "https://example.com/terms"
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
+// @contact.name	Murad Golang Backend
+// @contact.email	m.azizov03@mail.ru
+
+// @host	localhost:8082
+// @BasePath /api/v1
 package main
 
 import (
 	"context"
+	_ "gym_app/docs"
 	"gym_app/internal/app"
 	"gym_app/internal/config"
 	"gym_app/internal/lib/logger/handlers/slogpretty"
@@ -27,6 +41,11 @@ func main() {
 	log.Info("starting application")
 
 	application := app.New(ctx, log, cfg)
+
+	application.Cron.Start(ctx)
+
+	log.Info("cron jobs started")
+	defer application.Cron.Stop()
 
 	go application.HTTPSrv.Run()
 

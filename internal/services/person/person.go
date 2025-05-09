@@ -18,14 +18,14 @@ type PersonService struct {
 type PersonStorage interface {
 	SavePerson(ctx context.Context, person models.Person) (int, error)
 	FindAllPeople(ctx context.Context) ([]models.Person, error)
-	FindSubsByPersonName(ctx context.Context, name string) ([]models.Subscription, error)
+	UpdatePerson(ctx context.Context, person models.Person, pID int) (int, error)
+	DeletePerson(ctx context.Context, pID int) error
+	FindPersonByName(ctx context.Context, name string) (models.Person, error)
 }
 
 var (
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrInvalidAppId       = errors.New("invalid app id")
-	ErrUserExists         = errors.New("user already exists")
-	ErrUserNotFound       = errors.New("user not found")
+	ErrPersonExists   = errors.New("person already exists")
+	ErrPersonNotFound = errors.New("person not found")
 )
 
 func New(
@@ -53,13 +53,92 @@ func (p *PersonService) AddPerson(ctx context.Context, person models.Person) (in
 		if errors.Is(err, storage.ErrUserExists) {
 			log.Warn("user already exists", sl.Error(err))
 
-			return 0, fmt.Errorf("%s: %w", op, ErrUserExists)
+			return 0, fmt.Errorf("%s: %w", op, ErrPersonExists)
 		}
+
+		return 0, err
 	}
 
 	log.Info("person registered", "pid", personId)
 
 	return personId, nil
+}
+
+func (p *PersonService) UpdatePerson(ctx context.Context, person models.Person, pID int) (int, error) {
+	const op = "services.person.UpdatePerson"
+
+	log := p.log.With(
+		slog.String("op", op),
+	)
+
+	log.Info("Updating user")
+
+	personId, err := p.personStorage.UpdatePerson(ctx, person, pID)
+	if err != nil {
+		if errors.Is(err, storage.ErrPersonNotFound) {
+			log.Warn("user not found", sl.Error(err))
+
+			return 0, fmt.Errorf("%s: %w", op, ErrPersonNotFound)
+		}
+
+		if errors.Is(err, storage.ErrUserExists) {
+			log.Warn("user already exists", sl.Error(err))
+
+			return 0, fmt.Errorf("%s: %w", op, ErrPersonExists)
+		}
+
+		return 0, err
+	}
+
+	log.Info("person updated", "pid", personId)
+
+	return personId, nil
+}
+
+func (p *PersonService) DeletePerson(ctx context.Context, pID int) error {
+	const op = "services.person.DeletePerson"
+
+	log := p.log.With(
+		slog.String("op", op),
+	)
+
+	log.Info("Deleting user")
+
+	err := p.personStorage.DeletePerson(ctx, pID)
+	if err != nil {
+		if errors.Is(err, storage.ErrPersonNotFound) {
+			log.Warn("user not found", sl.Error(err))
+
+			return fmt.Errorf("%s: %w", op, ErrPersonNotFound)
+		}
+	}
+
+	log.Info("person deleted")
+
+	return nil
+}
+
+func (p *PersonService) FindPersonByName(ctx context.Context, name string) (models.Person, error) {
+	const op = "services.person.FindPersonByName"
+
+	log := p.log.With(
+		slog.String("op", op),
+	)
+
+	log.Info("Finding user by name")
+
+	person, err := p.personStorage.FindPersonByName(ctx, name)
+	if err != nil {
+		if errors.Is(err, storage.ErrPersonNotFound) {
+			log.Warn("user not found", sl.Error(err))
+
+			return models.Person{}, fmt.Errorf("%s: %w", op, ErrPersonNotFound)
+		}
+	}
+
+	log.Info("person found")
+
+	return person, nil
 }
 
 func (p *PersonService) FindAllPeople(ctx context.Context) ([]models.Person, error) {
@@ -81,28 +160,4 @@ func (p *PersonService) FindAllPeople(ctx context.Context) ([]models.Person, err
 	log.Info("People are found")
 
 	return allPeople, nil
-}
-
-func (p *PersonService) FindSubsByPersonName(ctx context.Context, name string) ([]models.Subscription, error) {
-	const op = "services.person.findPersonByName"
-
-	log := p.log.With(
-		slog.String("op", op),
-	)
-
-	subscriptions, err := p.personStorage.FindSubsByPersonName(ctx, name)
-	if err != nil {
-		log.Warn("error", sl.Error(err))
-
-		return nil, fmt.Errorf("%s: %w", op, err)
-	}
-
-	//var subss []models.Subscription
-	//for _, subscription := range subscriptions {
-	//	subss = append(subss, services.EnrichSubscription(subscription))
-	//}
-
-	log.Info("Person are found")
-
-	return subscriptions, nil
 }

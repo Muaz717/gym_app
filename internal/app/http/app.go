@@ -4,14 +4,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	"gym_app/internal/clients/sso/grpc"
 	"gym_app/internal/config"
-	personHandler "gym_app/internal/http/person"
-	membershipHandler "gym_app/internal/http/subscription"
+	authHandler "gym_app/internal/http/handlers/auth"
+	"gym_app/internal/http/handlers/person"
+	personSubHandler "gym_app/internal/http/handlers/person_sub"
+	subscriptionHandler "gym_app/internal/http/handlers/subscription"
+	"gym_app/internal/http/middleware/auth"
+	loggerMiddleware "gym_app/internal/http/middleware/logger"
 	"gym_app/internal/lib/logger/sl"
 	"log/slog"
 	"net/http"
 	"time"
+)
+
+const (
+	userRole  = "user"
+	adminRole = "admin"
 )
 
 type HttpApp struct {
@@ -26,31 +39,74 @@ func New(
 	ctx context.Context,
 	log *slog.Logger,
 	cfg config.Config,
+	ssoClient *grpc.SSOClient,
+	authService authHandler.AuthService,
 	personService personHandler.PersonService,
-	membershipService membershipHandler.SubscriptionService,
+	subscriptionService subscriptionHandler.SubscriptionService,
+	personSubService personSubHandler.PersonSubService,
 ) *HttpApp {
 
 	personHandle := personHandler.New(ctx, log, personService)
-	membershipHandle := membershipHandler.New(ctx, log, membershipService)
+	subscriptionHandle := subscriptionHandler.New(ctx, log, subscriptionService)
+	personSubHandle := personSubHandler.New(ctx, log, personSubService)
+	authHandle := authHandler.New(ctx, log, authService)
 
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 
-	engine.Use(gin.Recovery())
-	//engine.Use(RequestIDMiddleware(log))
-	// engine.Use(CustomLoggerMiddleware(log)) // можно подключить свое логирование запросов
+	setupMiddleware(engine, log, cfg)
 
-	people := engine.Group("/people")
+	userMiddleware := authMiddleware.AuthMiddleware(log, ssoClient, cfg.AppID, userRole)
+	adminMiddleware := authMiddleware.AuthMiddleware(log, ssoClient, cfg.AppID, adminRole)
+
+	engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	api := engine.Group("/api/v1")
+
+	auth := api.Group("/auth")
 	{
-		people.POST("/add", personHandle.AddPerson)
-		people.GET("/:name", personHandle.FindSubsByPersonName)
-		people.GET("/", personHandle.FindAllPeople)
+		auth.POST("/register", authHandle.RegisterNewUser)
+		auth.POST("/login", authHandle.Login)
 	}
 
-	membership := engine.Group("/membership")
+	api.Use(userMiddleware)
 	{
-		membership.POST("/add", membershipHandle.AddSubscription)
-		membership.GET("/", membershipHandle.FindAllSubscriptions)
+		people := api.Group("/people")
+		{
+			people.GET("", personHandle.FindAllPeople)
+			people.GET("/find", personHandle.FindPersonByName)
+
+			adminPeople := people.Group("")
+			adminPeople.Use(adminMiddleware)
+			adminPeople.POST("/add", personHandle.AddPerson)
+			adminPeople.PUT("update/:id", personHandle.UpdatePerson)
+			adminPeople.DELETE("delete/:id", personHandle.DeletePerson)
+
+		}
+
+		subscription := api.Group("/subscription")
+		{
+			subscription.GET("", subscriptionHandle.FindAllSubscriptions)
+
+			adminSubscription := subscription.Group("")
+			adminSubscription.Use(adminMiddleware)
+			adminSubscription.POST("/add", subscriptionHandle.AddSubscription)
+			adminSubscription.PUT("update/:id", subscriptionHandle.UpdateSubscription)
+			adminSubscription.DELETE("delete/:id", subscriptionHandle.DeleteSubscription)
+		}
+
+		personSub := api.Group("/person_sub")
+		{
+
+			personSub.GET("find/:number", personSubHandle.FindPersonSubByNumber)
+			personSub.GET("", personSubHandle.FindAllPersonSubs)
+			personSub.GET("/find", personSubHandle.FindPersonSubByPersonName)
+
+			adminPersonSub := personSub.Group("")
+			adminPersonSub.Use(adminMiddleware)
+			adminPersonSub.POST("/add", personSubHandle.AddPersonSub)
+			adminPersonSub.DELETE("delete/:number", personSubHandle.DeletePersonSub)
+		}
 	}
 
 	srv := &http.Server{
@@ -103,4 +159,17 @@ func (a *HttpApp) Stop() error {
 	}
 
 	return nil
+}
+
+func setupMiddleware(engine *gin.Engine, log *slog.Logger, cfg config.Config) {
+	engine.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"}, // Или cfg.AllowedOrigins
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
+
+	engine.Use(gin.Recovery())
+	engine.Use(loggerMiddleware.New(log))
 }

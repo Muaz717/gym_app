@@ -1,5 +1,6 @@
 env: local # dev, prod
 token_ttl: 12h
+app_id: 1
 http_server:
   address: "0.0.0.0:8082"
   timeout: 4s
@@ -9,3 +10,9 @@ db:
   port: 5432
   username: postgres
   dbname: gym_db
+
+clients:
+  sso:
+    address: "localhost:44044"
+    timeout: 4s
+    retries_count: 3

@@ -1,0 +1,5 @@
+# Frontend
+web/frontend/node_modules
+web/frontend/build
+web/frontend/.env
+web/frontend/.DS_Store

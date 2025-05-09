@@ -9,7 +9,7 @@ import (
 	"gym_app/internal/storage"
 )
 
-func (s *Storage) AddSubscription(
+func (s *Storage) SaveSubscription(
 	ctx context.Context,
 	subscription models.Subscription,
 ) (int, error) {
@@ -27,6 +27,44 @@ func (s *Storage) AddSubscription(
 	return subId, nil
 }
 
+func (s *Storage) UpdateSubscription(
+	ctx context.Context,
+	subscription models.Subscription,
+	subID int,
+) (int, error) {
+	const op = "postgres.updateSubscription"
+
+	query := `UPDATE subscriptions SET title = $1, price = $2, duration_days = $3, freeze_days = $4 WHERE id = $5 RETURNING id`
+
+	row := s.db.QueryRow(ctx, query, subscription.Title, subscription.Price, subscription.DurationDays, subscription.FreezeDays, subID)
+
+	var subId int
+	if err := row.Scan(&subId); err != nil {
+		return 0, fmt.Errorf("%s: %w", op, err)
+	}
+
+	return subId, nil
+}
+
+func (s *Storage) DeleteSubscription(
+	ctx context.Context,
+	subID int,
+) error {
+	const op = "postgres.deleteSubscription"
+
+	query := `DELETE FROM subscriptions WHERE id = $1`
+
+	_, err := s.db.Exec(ctx, query, subID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("%s: %w", op, storage.ErrPersonNotFound)
+		}
+		return fmt.Errorf("%s: %w", op, err)
+	}
+
+	return nil
+}
+
 func (s *Storage) FindAllSubscriptions(ctx context.Context) ([]models.Subscription, error) {
 	const op = "postgres.FindAllSubscriptions"
 
@@ -35,7 +73,7 @@ func (s *Storage) FindAllSubscriptions(ctx context.Context) ([]models.Subscripti
 	rows, err := s.db.Query(ctx, query)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("%s: %w", op, storage.ErrUserNotFound)
+			return nil, fmt.Errorf("%s: %w", op, storage.ErrPersonNotFound)
 		}
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
